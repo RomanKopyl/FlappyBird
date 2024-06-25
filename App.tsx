@@ -1,10 +1,11 @@
-import { Canvas, Image, useImage } from "@shopify/react-native-skia";
+import { Canvas, Group, Image, useImage } from "@shopify/react-native-skia";
 import React, { useEffect } from "react";
 import { useWindowDimensions } from "react-native";
 import { GestureHandlerRootView, GestureDetector, Gesture } from "react-native-gesture-handler";
-import { Easing, useFrameCallback, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
+import { Easing, Extrapolation, interpolate, useDerivedValue, useFrameCallback, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 
-const GRAVITY = 500;
+const GRAVITY = 1000;
+const JUMP_FORCE = -500;
 
 const App = () => {
   const { width, height } = useWindowDimensions();
@@ -15,10 +16,23 @@ const App = () => {
   const pipeTop = useImage(require('./assets/sprites/pipe-green-top.png'));
   const base = useImage(require('./assets/sprites/base.png'));
 
-  const x = useSharedValue(width - 50);
+  const x = useSharedValue(width);
 
-  const birdY = useSharedValue(height / 2);
-  const birdYVelocity = useSharedValue(100);
+  const birdY = useSharedValue(height / 3);
+  const birdYVelocity = useSharedValue(0);
+  const birdTransform = useDerivedValue(() => {
+    return [{
+      rotate: interpolate(
+        birdYVelocity.value,
+        [-500, 500],
+        [-0.5, 0.5],
+        Extrapolation.CLAMP
+      )
+    }];
+  });
+  const birdOrigin = useDerivedValue(() => {
+    return { x: width / 4 + 32, y: birdY.value + 24 };
+  });
 
   useFrameCallback(({ timeSincePreviousFrame: dt }) => {
     if (!dt) {
@@ -39,7 +53,7 @@ const App = () => {
   }, []);
 
   const gesture = Gesture.Tap().onStart(() => {
-    birdYVelocity.value = -300;
+    birdYVelocity.value = JUMP_FORCE;
   });
 
   const pipeOffset = 0;
@@ -47,7 +61,7 @@ const App = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <GestureDetector gesture={gesture}>
-        <Canvas style={{ width, height }}        >
+        <Canvas style={{ width, height }}>
           {/* BG */}
           <Image width={width} height={height} fit={'cover'} image={bg} />
 
@@ -78,7 +92,18 @@ const App = () => {
           />
 
           {/* Bird */}
-          <Image image={bird} y={birdY} x={width / 4} width={64} height={48} />
+          <Group
+            transform={birdTransform}
+            origin={birdOrigin}
+          >
+            <Image
+              image={bird}
+              y={birdY}
+              x={width / 4}
+              width={64}
+              height={48}
+            />
+          </Group>
         </Canvas>
       </GestureDetector>
     </GestureHandlerRootView>
