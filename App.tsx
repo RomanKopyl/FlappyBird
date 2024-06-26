@@ -35,65 +35,65 @@ const App = () => {
   // const font = useFont(require('./assets/fonts/Roboto-Bold.ttf'), 20);
 
   const gameOver = useSharedValue(false);
-  const x = useSharedValue(width);
+  const pipeX = useSharedValue(width);
 
   const birdY = useSharedValue(height / 3);
-  const birdPosition = {
-    x: width / 4,
-  };
+  const birdX = width / 4;
   const birdYVelocity = useSharedValue(0);
 
-  const birdCenterX = useDerivedValue(() => birdPosition.x + 32);
-  const birdCenterY = useDerivedValue(() => birdY.value + 24);
   const pipeOffset = useSharedValue(0);
   const topPipeY = useDerivedValue(() => pipeOffset.value - 320);
   const bottomPipeY = useDerivedValue(() => height - 320 + pipeOffset.value);
 
-  const obstacles = useDerivedValue(() => {
-    const allObstacles = [];
+  const pipesSpeed = useDerivedValue(() => {
+    return interpolate(score, [0, 20], [1, 2])
+  });
 
+  const obstacles = useDerivedValue(() => [
     // add top pipe
-    allObstacles.push({
-      x: x.value,
+    {
+      x: pipeX.value,
       y: topPipeY.value,
       h: pipeHeight,
       w: pipeWidth,
-    });
+    },
 
     // add bottom pipe
-    allObstacles.push({
-      x: x.value,
+    {
+      x: pipeX.value,
       y: bottomPipeY.value,
       h: pipeHeight,
       w: pipeWidth,
-    });
-
-    return allObstacles;
-  })
+    },
+  ]);
 
   useEffect(() => {
     moveTheMap();
   }, []);
 
   const moveTheMap = () => {
-    x.value = withRepeat(
+    pipeX.value =
       withSequence(
-        withTiming(-150, { duration: 3000, easing: Easing.linear }),
         withTiming(width, { duration: 0 }),
-      ),
-      -1
-    );
+        withTiming(-150, {
+          duration: 3000 / pipesSpeed.value,
+          easing: Easing.linear,
+        }),
+        withTiming(width, { duration: 0 }),
+      );
   }
 
   // Scoring system
   useAnimatedReaction(
-    () => x.value,
+    () => pipeX.value,
     (currentValue, previousValue) => {
-      const middle = birdPosition.x;
+      const middle = birdX;
 
       // change offset for the postion of the next gap
       if (currentValue < -100 && previousValue > -100) {
         pipeOffset.value = Math.random() * 400 - 200;
+        cancelAnimation(pipeX);
+        runOnJS(moveTheMap)();
       }
 
       if (
@@ -121,16 +121,18 @@ const App = () => {
   useAnimatedReaction(
     () => birdY.value,
     (currentValue, previeusValue) => {
+      const center = {
+        x: birdX + 32,
+        y: birdY.value + 24
+      };
+
       // Groun collision detection
       if (currentValue > height - 100 || currentValue < 0) {
         gameOver.value = true;
       }
 
       const isColliding = obstacles.value.some((rect) =>
-        isPointCollidingWithRect(
-          { x: birdCenterX.value, y: birdCenterY.value },
-          rect
-        )
+        isPointCollidingWithRect(center, rect)
       );
 
       if (isColliding) {
@@ -143,7 +145,7 @@ const App = () => {
     () => gameOver.value,
     (currentValue, previeusValue) => {
       if (currentValue && !previeusValue) {
-        cancelAnimation(x);
+        cancelAnimation(pipeX);
       }
     }
   );
@@ -161,7 +163,7 @@ const App = () => {
     birdY.value = height / 3;
     birdYVelocity.value = 0;
     gameOver.value = false;
-    x.value = width;
+    pipeX.value = width;
     runOnJS(moveTheMap)();
     runOnJS(setScore)(0);
   };
@@ -171,7 +173,7 @@ const App = () => {
       // restart
       restartGame();
     } else {
-      // Jamp
+      // Jump
       birdYVelocity.value = JUMP_FORCE;
     }
   });
@@ -209,14 +211,14 @@ const App = () => {
           <Image
             image={pipeTop}
             y={topPipeY}
-            x={x}
+            x={pipeX}
             width={pipeWidth}
             height={pipeHeight}
           />
           <Image
             image={pipeBottom}
             y={bottomPipeY}
-            x={x}
+            x={pipeX}
             width={pipeWidth}
             height={pipeHeight}
           />
@@ -239,19 +241,11 @@ const App = () => {
             <Image
               image={bird}
               y={birdY}
-              x={birdPosition.x}
+              x={birdX}
               width={64}
               height={48}
             />
           </Group>
-
-          {/* Sim */}
-          {/* <Circle
-            cx={birdCenterX}
-            cy={birdCenterY}
-            r={15}
-          /> */}
-          {/* <Rect x={0} y={0} width={256} height={256} color="lightblue" /> */}
 
           {/* Score */}
           <Text x={width / 2} y={100} text={score.toString()} font={font} />
